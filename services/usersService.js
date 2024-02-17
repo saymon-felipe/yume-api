@@ -32,14 +32,15 @@ let userService = {
                             `
                                 INSERT INTO
                                     users
-                                    (nickname, email, password, profile_photo)
+                                    (nickname, email, password, profile_photo, banner_photo)
                                 VALUES
-                                    (?, ?, ?, ?)
+                                    (?, ?, ?, ?, ?)
                             `, [
                                 nickname, 
                                 email, 
                                 hash, 
-                                process.env.URL_API + '/public/default-user-image.png'
+                                process.env.URL_API + '/public/default-user-image.png',
+                                process.env.URL_API + '/public/default-banner-image.png'
                             ]
                         ).then((results2) => {
 
@@ -127,6 +128,7 @@ let userService = {
                         u.nickname,
                         u.email,
                         u.profile_photo,
+                        u.banner_photo,
                         u.create_date,
                         u.visibility,
                         COUNT(f.id) AS friends,
@@ -145,20 +147,46 @@ let userService = {
                         u.id = ?
                 `, [user_id]
             ).then((results) => {
-                let user = {
-                    id: results[0].id,
-                    nickname: results[0].nickname,
-                    nick_at_sign: "@" + results[0].nickname,
-                    email: return_email ? results[0].email : "",
-                    profile_photo: results[0].profile_photo,
-                    create_date: results[0].create_date,
-                    visibility: results[0].visibility,
-                    friends: results[0].friends,
-                    friend_ids: results[0].friend_ids ? results[0].friend_ids.split(",") : [],
-                    posts: results[0].posts
-                }
-
-                resolve(user);
+                functions.executeSql(
+                    `
+                        SELECT
+                            u.id,
+                            u.nickname,
+                            u.profile_photo,
+                            (
+                                SELECT
+                                    COUNT(id)
+                                FROM
+                                    friends
+                                WHERE
+                                    friend1 = u.id OR friend2 = u.id
+                            ) AS friends
+                        FROM 
+                            users u
+                        INNER JOIN
+                            friends f ON (f.friend1 = u.id OR f.friend2 = u.id)
+                        WHERE
+                            (f.friend1 = ? OR f.friend2 = ?)
+                            AND u.id != ?
+                    `, [user_id, user_id, user_id]
+                ).then((results2) => {
+                    let user = {
+                        id: results[0].id,
+                        nickname: results[0].nickname,
+                        nick_at_sign: "@" + results[0].nickname,
+                        email: return_email ? results[0].email : "",
+                        profile_photo: results[0].profile_photo,
+                        banner_photo: results[0].banner_photo,
+                        create_date: results[0].create_date,
+                        visibility: results[0].visibility,
+                        friends: results[0].friends,
+                        friend_ids: results[0].friend_ids ? results[0].friend_ids.split(",") : [],
+                        posts: results[0].posts,
+                        friends_objects: results2
+                    }
+    
+                    resolve(user);
+                })
             }).catch((error) => {
                 reject(error);
             })

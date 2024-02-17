@@ -48,8 +48,8 @@ router.get("/return_user", login, (req, res, next) => {
     })
 });
 
-router.get("/return__public_user", login, (req, res, next) => {
-    _usersService.returnUser(req.usuario.id, false).then((results) => {
+router.post("/return_public_user", login, (req, res, next) => {
+    _usersService.returnUser(req.body.id, false).then((results) => {
         let response = functions.createResponse("Retorno do usuário", results, "GET", 200);
         return res.status(200).send(response);
     }).catch((error) => {
