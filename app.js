@@ -6,6 +6,7 @@ const bodyParser = require("body-parser");
 const cors = require('cors');
 
 const usersRoute = require('./routes/users');
+const chatRoute = require("./routes/chat");
 
 app.use(morgan('dev'));
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/users', usersRoute);
+app.use('/chat', chatRoute);
 
 app.use('/public', express.static('public'));
 

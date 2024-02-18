@@ -53,9 +53,31 @@ router.post("/return_public_user", login, (req, res, next) => {
         let response = functions.createResponse("Retorno do usuário", results, "GET", 200);
         return res.status(200).send(response);
     }).catch((error) => {
-        console.log(error)
         return res.status(500).send(error);
     })
 });
+
+function logoutUsers() {
+    functions.executeSql(`
+        UPDATE
+            users
+        SET
+            user_status = "offline"
+        WHERE
+            last_update <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 second)
+    `, [])
+    .then((results) => {
+        setTimeout(logoutUsers, 20 * 1000);
+    })
+    .catch((error) => {
+        console.log("Error in desconnect users. Error: " + error);
+    }).then((results) => {
+        setTimeout(logoutUsers, 20 * 1000);
+    })
+}
+
+setTimeout(() => {
+    logoutUsers();
+}, 100);
 
 module.exports = router;

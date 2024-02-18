@@ -109,12 +109,24 @@ let userService = {
                 if (err) {
                     reject("Token inválido");
                 } else {
-                    let newToken = jwt.sign({
-                        id: decoded.id,
-                        email: decoded.email,
-                        nickname: decoded.nickname
-                    }, process.env.JWT_KEY, {expiresIn: "8h"});
-                    resolve(newToken);
+                    functions.executeSql(
+                        `
+                            UPDATE
+                                users
+                            SET
+                                user_status = "online", last_update = DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour)
+                            WHERE
+                                id = ?
+                        `, [decoded.id]
+                    ).then(() => {
+                        let newToken = jwt.sign({
+                            id: decoded.id,
+                            email: decoded.email,
+                            nickname: decoded.nickname
+                        }, process.env.JWT_KEY, {expiresIn: "8h"});
+                        
+                        resolve(newToken);
+                    })
                 }
             })
         })
