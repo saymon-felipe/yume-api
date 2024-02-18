@@ -35,4 +35,15 @@ router.post("/return_messages", login, (req, res, next) => {
     })
 })
 
+router.post("/view_messages", login, (req, res, next) => {
+    _chatService.isFriends(req.usuario.id, req.body.destiny_user_id).then(() => {
+        _chatService.viewMessages(req.body.destiny_user_id, req.usuario.id).then(() => {
+            let response = functions.createResponse("Visualizar todas as mensagens", null, "POST", 200);
+            return res.status(200).send(response);
+        })
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
 module.exports = router;

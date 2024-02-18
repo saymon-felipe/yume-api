@@ -71,8 +71,10 @@ let chatService = {
             })
         })
     },
-    returnMessages: function (user1, user2) {
+    returnMessages: function (sender, receiver) {
         return new Promise((resolve, reject) => {
+            let self = this;
+
             functions.executeSql(
                 `
                     SET @user1 := ?;
@@ -84,13 +86,35 @@ let chatService = {
                         messages
                     WHERE
                         (sender_id = @user1 OR receiver_id = @user1) AND (sender_id = @user2 OR receiver_id = @user2)
-                `, [user1, user2]
+                `, [sender, receiver]
             ).then((results) => {
-                let messages = {
-                    messages: results[2]
-                }
-
-                resolve(messages);
+                self.viewMessages(receiver, sender).then(() => {
+                    let messages = {
+                        messages: results[2]
+                    }
+    
+                    resolve(messages);
+                }).catch((error) => {
+                    reject(error);
+                })
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    viewMessages: function (sender, receiver) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        messages
+                    SET
+                        view_date = DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour)
+                    WHERE
+                        sender_id = ? AND receiver_id = ?
+                `, [sender, receiver]
+            ).then(() => {
+                resolve();
             }).catch((error) => {
                 reject(error);
             })
