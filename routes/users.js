@@ -31,6 +31,7 @@ router.post("/check_jwt", (req, res, next) => {
         let returnObj = {
             newToken: results
         }
+
         let response = functions.createResponse("Token válido e foi renovado", returnObj, "POST", 200);
         return res.status(200).send(response);
     }).catch((error) => {
@@ -43,7 +44,6 @@ router.get("/return_user", login, (req, res, next) => {
         let response = functions.createResponse("Retorno do usuário", results, "GET", 200);
         return res.status(200).send(response);
     }).catch((error) => {
-        console.log(error)
         return res.status(500).send(error);
     })
 });

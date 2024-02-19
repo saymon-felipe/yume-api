@@ -119,6 +119,58 @@ let chatService = {
                 reject(error);
             })
         })
+    },
+    checkNewMessages: function(sender, receiver) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        COUNT(id) AS new_messages
+                    FROM
+                        messages
+                    WHERE
+                        view_date = "" AND sender_id = ? AND receiver_id = ?
+                `, [sender, receiver]
+            ).then((results) => {
+                let data = {
+                    have_new_messages: false
+                }
+    
+                if (results[0].new_messages > 0) {
+                    data.have_new_messages = true;
+                }
+    
+                resolve(data);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    checkViewedMessages: function(sender, receiver) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        COUNT(id) AS not_viewed_messages
+                    FROM
+                        messages
+                    WHERE
+                        view_date = "" AND sender_id = ? AND receiver_id = ?
+                `, [sender, receiver]
+            ).then((results) => {
+                let data = {
+                    viewed_messages: false
+                }
+    
+                if (results[0].not_viewed_messages == 0) {
+                    data.viewed_messages = true;
+                }
+    
+                resolve(data);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
     }
 }
 

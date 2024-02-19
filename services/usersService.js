@@ -126,6 +126,8 @@ let userService = {
                         }, process.env.JWT_KEY, {expiresIn: "8h"});
                         
                         resolve(newToken);
+                    }).catch((error) => {
+                        reject(error);
                     })
                 }
             })
@@ -198,6 +200,8 @@ let userService = {
                     }
     
                     resolve(user);
+                }).catch((error) => {
+                    reject(error);
                 })
             }).catch((error) => {
                 reject(error);
