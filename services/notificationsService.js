@@ -7,8 +7,6 @@ let notificationsService = {
 
             functions.executeSql(
                 `
-                    SET @connected_user := ?;
-
                     SELECT
                         "frienship_request" AS type,
                         fr.requesting_user AS user_id,
@@ -24,15 +22,15 @@ let notificationsService = {
                     INNER JOIN
                         users u ON u.id = fr.requesting_user
                     WHERE
-                        fr.accepted = 0 AND fr.requested_user = @connected_user
+                        fr.accepted = 0 AND fr.requested_user = ?
                     ORDER BY fr.create_date DESC
                 `, [connected_user]
             ).then((results) => {
-                notificationsLength += results[1].length;
+                notificationsLength += results.length;
 
                 let notifications = {
                     length: notificationsLength,
-                    objects: results[1]
+                    objects: results
                 }
 
                 resolve(notifications);

@@ -15,9 +15,9 @@ let chatService = {
                     INNER JOIN
                         friends f ON (f.friend1 = u.id OR f.friend2 = u.id)
                     WHERE
-                        (f.friend1 = ? OR f.friend2 = ?)
-                        AND u.id != ?
-                `, [user_id, user_id, user_id]
+                        (f.friend1 = ${user_id} OR f.friend2 = ${user_id})
+                        AND u.id != ${user_id}
+                `, []
             ).then((results) => {
                 let friends = {
                     friends: results
@@ -33,18 +33,15 @@ let chatService = {
         return new Promise((resolve, reject) => {
             functions.executeSql(
                 `
-                    SET @user1 := ?;
-                    SET @user2 := ?;
-
                     SELECT
                         id
                     FROM
                         friends
                     WHERE
-                        (friend1 = @user1 OR friend2 = @user1) AND (friend1 = @user2 OR friend2 = @user2)
-                `, [user1, user2]
+                        (friend1 = ${user1} OR friend2 = ${user1}) AND (friend1 = ${user2} OR friend2 = ${user2})
+                `, []
             ).then((results) => {
-                if (results[2][0] == undefined) {
+                if (results[0].id == undefined) {
                     reject("O destinatário não está em sua lista de amigos");
                 }
                 
@@ -77,20 +74,17 @@ let chatService = {
 
             functions.executeSql(
                 `
-                    SET @user1 := ?;
-                    SET @user2 := ?;
-
                     SELECT
                         *
                     FROM
                         messages
                     WHERE
-                        (sender_id = @user1 OR receiver_id = @user1) AND (sender_id = @user2 OR receiver_id = @user2)
-                `, [sender, receiver]
+                        (sender_id = ${sender} OR receiver_id = ${sender}) AND (sender_id = ${receiver} OR receiver_id = ${receiver})
+                `, []
             ).then((results) => {
                 self.viewMessages(receiver, sender).then(() => {
                     let messages = {
-                        messages: results[2]
+                        messages: results
                     }
     
                     resolve(messages);
