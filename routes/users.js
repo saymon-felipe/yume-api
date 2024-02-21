@@ -66,10 +66,7 @@ function logoutUsers() {
         WHERE
             last_update <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 second)
     `, [])
-    .then((results) => {
-        setTimeout(logoutUsers, 20 * 1000);
-    })
-    .catch((error) => {
+    .then().catch((error) => {
         console.log("Error in desconnect users. Error: " + error);
     }).then((results) => {
         setTimeout(logoutUsers, 20 * 1000);

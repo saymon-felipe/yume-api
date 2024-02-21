@@ -4,6 +4,9 @@ const uploadConfig = require('../config/upload');
 const sendEmails = require("../config/sendEmail");
 const emailTemplates = require("../templates/emailTemplates");
 const jwt = require('jsonwebtoken');
+const NodeCache = require('node-cache');
+
+const tokenCache = new NodeCache({ stdTTL: 28.800 });
 
 let userService = {
     register: function (email, nickname, password) {
@@ -118,12 +121,19 @@ let userService = {
                             WHERE
                                 id = ?
                         `, [decoded.id]
-                    ).then(() => {
+                    ).then((results) => {
+                        if (results.affectedRows == 0) {
+                            reject("Usuário não encontrado");
+                        }
+
                         let newToken = jwt.sign({
                             id: decoded.id,
                             email: decoded.email,
                             nickname: decoded.nickname
                         }, process.env.JWT_KEY, {expiresIn: "8h"});
+
+                        tokenCache.set(decoded.id, newToken);
+                        tokenCache.del(token);
                         
                         resolve(newToken);
                     }).catch((error) => {

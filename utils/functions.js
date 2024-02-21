@@ -6,14 +6,14 @@ let functions = {
             mysql.getConnection((error, conn) => {
                 if (error) {
                     reject(error);
-                    return;
-                };
+                }
+
                 conn.query(query, queryParams, (err, results) => {
                     conn.release();
                     if (err) {
                         reject(err);
-                        return;
-                    };
+                    }
+                    
                     resolve(results);
                 })
             })
