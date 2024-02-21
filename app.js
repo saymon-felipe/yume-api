@@ -7,6 +7,8 @@ const cors = require('cors');
 
 const usersRoute = require('./routes/users');
 const chatRoute = require("./routes/chat");
+const notificationsRoute = require("./routes/notifications");
+const friendsRoute = require("./routes/friends");
 
 app.use(morgan('dev'));
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -32,6 +34,8 @@ app.use((req, res, next) => {
 
 app.use('/users', usersRoute);
 app.use('/chat', chatRoute);
+app.use('/notifications', notificationsRoute);
+app.use("/friends", friendsRoute);
 
 app.use('/public', express.static('public'));
 
