@@ -4,6 +4,9 @@ const NodeCache = require('node-cache');
 
 const cache = new NodeCache();
 
+let queriesQuantity = 0;
+let cachedQueriesQuantity = 0;
+
 let functions = {
     executeSql: function (query, queryParams = [], useCache = false, cacheSeconds = 60) {
         return new Promise((resolve, reject) => {
@@ -33,9 +36,12 @@ let functions = {
     
                     // Armazena o resultado em cache se useCache for verdadeiro
                     if (useCache) {
+                        cachedQueriesQuantity++;
                         const cacheKey = query + JSON.stringify(queryParams);
                         cache.set(cacheKey, results, cacheSeconds);
                         console.log('Result cached for query:', query);
+                    } else {
+                        queriesQuantity++;
                     }
     
                     resolve(results);
