@@ -57,24 +57,4 @@ router.post("/return_public_user", login, (req, res, next) => {
     })
 });
 
-function logoutUsers() {
-    functions.executeSql(`
-        UPDATE
-            users
-        SET
-            user_status = "offline"
-        WHERE
-            last_update <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 second)
-    `, [])
-    .then().catch((error) => {
-        console.log("Error in desconnect users. Error: " + error);
-    }).then((results) => {
-        setTimeout(logoutUsers, 20 * 1000);
-    })
-}
-
-setTimeout(() => {
-    logoutUsers();
-}, 100);
-
 module.exports = router;

@@ -9,7 +9,7 @@ let chatService = {
                         u.id,
                         u.nickname,
                         u.profile_photo,
-                        u.user_status
+                        u.online
                     FROM 
                         users u
                     INNER JOIN

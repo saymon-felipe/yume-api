@@ -105,6 +105,24 @@ let userService = {
             })
         })
     },
+    updateOnline: function (online = 0, user_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        users
+                    SET
+                        online = ?, last_update = DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour)
+                    WHERE
+                        id = ?
+                `, [online, user_id]
+            ).then((results) => {
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
     checkJwt: function (tokenParam) {
         return new Promise((resolve, reject) => {
             let token = tokenParam.split(" ")[1];
@@ -112,33 +130,16 @@ let userService = {
                 if (err) {
                     reject("Token inválido");
                 } else {
-                    functions.executeSql(
-                        `
-                            UPDATE
-                                users
-                            SET
-                                user_status = "online", last_update = DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour)
-                            WHERE
-                                id = ?
-                        `, [decoded.id]
-                    ).then((results) => {
-                        if (results.affectedRows == 0) {
-                            reject("Usuário não encontrado");
-                        }
+                    let newToken = jwt.sign({
+                        id: decoded.id,
+                        email: decoded.email,
+                        nickname: decoded.nickname
+                    }, process.env.JWT_KEY, {expiresIn: "8h"});
 
-                        let newToken = jwt.sign({
-                            id: decoded.id,
-                            email: decoded.email,
-                            nickname: decoded.nickname
-                        }, process.env.JWT_KEY, {expiresIn: "8h"});
-
-                        tokenCache.set(decoded.id, newToken);
-                        tokenCache.del(token);
-                        
-                        resolve(newToken);
-                    }).catch((error) => {
-                        reject(error);
-                    })
+                    tokenCache.set(decoded.id, newToken);
+                    tokenCache.del(token);
+                    
+                    resolve(newToken);
                 }
             })
         })

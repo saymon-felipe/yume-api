@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { isFriends, sendMessage, viewMessages } = require('../services/chatService');
+const { updateOnline } = require("../services/usersService");
 
 function initWebSocket(server) {
   const wss = new WebSocket.Server({ server });
@@ -19,6 +20,8 @@ function initWebSocket(server) {
 
         userConnections.set(userId, ws);
 
+        updateUserStatus(userId, 1);
+
         // Evento de mensagem recebida
         ws.on('message', function incoming(message) {
             message = JSON.parse(message);
@@ -28,15 +31,12 @@ function initWebSocket(server) {
                     const receiverSocket = userConnections.get(message.receiver_id);
 
                     if (receiverSocket && receiverSocket.readyState === WebSocket.OPEN) {
-                        // Se o destinatário estiver conectado e o estado do socket for OPEN, enviar a mensagem diretamente
-
                         if (!userMessages.has(message.receiver_id)) {
                             userMessages.set(message.receiver_id, []);
                         }
 
                         userMessages.get(message.receiver_id).push(message);
                         receiverSocket.send(JSON.stringify(message));
-
                     } 
 
                     sendMessage(message.sender_id, message.receiver_id, message.sender_name, message.sender_profile_photo, message.receiver_name, message.message); // Salvar a mensagem no banco de dados ou estrutura de armazenamento
@@ -65,6 +65,24 @@ function initWebSocket(server) {
                     senderSocket.send(JSON.stringify({ type: 'message_viewed', senderId: senderId }));
                 }
             }
+
+            if (message.type == 'online') {
+                message.friends.forEach(friend => {
+                    let friendSocket = userConnections.get(parseInt(friend));
+                    if (friendSocket) {
+                        friendSocket.send(JSON.stringify({ type: 'online_friend', friend: userId }));
+                    }
+                })
+            }
+
+            if (message.type == 'offline') {
+                message.friends.forEach(friend => {
+                    let friendSocket = userConnections.get(parseInt(friend));
+                    if (friendSocket) {
+                        friendSocket.send(JSON.stringify({ type: 'offline_friend', friend: userId }));
+                    }
+                })
+            }
         });
     } catch (error) {
         ws.close();
@@ -77,6 +95,8 @@ function initWebSocket(server) {
         }
 
         userConnections.delete(userId);
+
+        updateUserStatus(userId, 0);
     });
 
     function updateMessageStatus(senderId) {        
@@ -87,6 +107,10 @@ function initWebSocket(server) {
         })
 
         viewMessages(senderId, userId);
+    }
+
+    function updateUserStatus(user_id, online = 0) {
+        updateOnline(online, user_id);
     }
 
   });
