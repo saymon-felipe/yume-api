@@ -22,6 +22,15 @@ router.post("/accept_request", login, (req, res, next) => {
     })
 })
 
+router.post("/reject_request", login, (req, res, next) => {
+    _friendsService.rejectFriendRequest(req.body.requesting_user, req.usuario.id).then(() => {
+        let response = functions.createResponse("Pedido de amizade removido", null, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
 router.post("/unfriend", login, (req, res, next) => {
     _friendsService.unfriend(req.usuario.id, req.body.target_user).then(() => {
         let response = functions.createResponse("Amizade desfeita", null, "POST", 200);

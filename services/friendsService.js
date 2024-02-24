@@ -54,6 +54,22 @@ let friendsService = {
             })
         })
     },
+    rejectFriendRequest: function (requesting_user, requested_user) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    DELETE FROM
+                        friend_requests
+                    WHERE
+                        requesting_user = ? AND requested_user = ?
+                `, [requesting_user, requested_user]
+            ).then(() => {
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
     acceptFriend: function (user1, user2) {
         return new Promise((resolve, reject) => {
             functions.executeSql(

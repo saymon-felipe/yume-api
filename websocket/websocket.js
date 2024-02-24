@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { isFriends, sendMessage, viewMessages } = require('../services/chatService');
 const { updateOnline } = require("../services/usersService");
+const { requestFriend } = require("../services/friendsService");
 
 function initWebSocket(server) {
   const wss = new WebSocket.Server({ server });
@@ -82,6 +83,24 @@ function initWebSocket(server) {
                         friendSocket.send(JSON.stringify({ type: 'offline_friend', friend: userId }));
                     }
                 })
+            }
+
+            if (message.type == 'friend_request') {
+                let targetSocket = userConnections.get(parseInt(message.user_id));
+
+                if (targetSocket) {
+                    requestFriend(userId, message.user_id).then(() => {
+                        targetSocket.send(JSON.stringify({ type: 'reload_notifications' }));
+                    });
+                }
+            } 
+
+            if (message.type == "reload_system") {
+                let mySocket = userConnections.get(userId);
+
+                if (mySocket) {
+                    mySocket.send(JSON.stringify({ type: 'reload_system' }));
+                }
             }
         });
     } catch (error) {
