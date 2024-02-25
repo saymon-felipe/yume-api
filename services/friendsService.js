@@ -122,7 +122,7 @@ let friendsService = {
                     DELETE FROM
                         friends
                     WHERE
-                        (friend1 = ${user_id} OR friend2 = ${user_id}) AND (friend1 = ${target_user} OR friend1 = ${target_user})
+                        (friend1 = ${user_id} OR friend1 = ${user_id}) AND (friend2 = ${target_user} OR friend2 = ${target_user})
                 `, []
             ).then(() => {
                 resolve();
