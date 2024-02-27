@@ -11,8 +11,14 @@ let postsService = {
                     VALUES
                         (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP(), interval -3 hour))
                 `, [user_id, post_text, post_image]
-            ).then(() => {
-                resolve();
+            ).then((results) => {
+                let post = {
+                    id: results.insertId,
+                    post_text: post_text,
+                    post_image: post_image
+                }
+                
+                resolve(post);
             }).catch((error) => {
                 reject(error);
             })

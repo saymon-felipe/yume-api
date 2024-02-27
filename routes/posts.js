@@ -6,16 +6,12 @@ const _postsService = require("../services/postsService");
 const functions = require("../utils/functions");
 
 router.post("/make_post", login, uploadConfig.upload.single('post_image'), (req, res, next) => {
-    if (req.file == undefined) {
-        return res.status(500).send("Tipo de arquivo não suportado");
-    } else {
-        _postsService.makePost(req.usuario.id, req.body.post_text, req.file.transforms[0].location).then(() => {
-            let response = functions.createResponse("Post feito com sucesso", null, "POST", 200);
-            return res.status(200).send(response);
-        }).catch((error) => {
-            return res.status(500).send(error);
-        })
-    }
+    _postsService.makePost(req.usuario.id, req.body.post_text, req.file != undefined ? req.file.transforms[0].location : "").then((results) => {
+        let response = functions.createResponse("Post feito com sucesso", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
 });
 
 router.get("/return_feed", login, (req, res, next) => {
