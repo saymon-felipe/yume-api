@@ -9,6 +9,7 @@ const usersRoute = require('./routes/users');
 const chatRoute = require("./routes/chat");
 const notificationsRoute = require("./routes/notifications");
 const friendsRoute = require("./routes/friends");
+const postsRoute = require("./routes/posts");
 
 app.use(morgan('dev'));
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -36,6 +37,7 @@ app.use('/users', usersRoute);
 app.use('/chat', chatRoute);
 app.use('/notifications', notificationsRoute);
 app.use("/friends", friendsRoute);
+app.use("/posts", postsRoute);
 
 app.use('/public', express.static('public'));
 

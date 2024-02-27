@@ -3,7 +3,7 @@ const multerS3 = require('multer-s3-transform');
 const multer = require('multer');
 const sharp = require('sharp');
 
-const imageWidth = 300;
+const imageWidth = 800;
 
 aws.config.update({
     accessKeyId: process.env.ACCESS_KEY_ID,

@@ -156,17 +156,17 @@ let userService = {
                         u.banner_photo,
                         u.create_date,
                         u.visibility,
-                        COUNT(f.id) AS friends,
-                        GROUP_CONCAT(CASE
+                        COUNT(DISTINCT f.id) AS friends,
+                        GROUP_CONCAT(DISTINCT CASE
                             WHEN f.friend1 = u.id THEN f.friend2
                             ELSE f.friend1
                         END) AS friend_ids,
-                        COUNT(p.id) AS posts
+                        COUNT(DISTINCT p.id) AS posts
                     FROM
                         users u
-                    LEFT JOIN
+                    JOIN
                         friends f ON f.friend1 = u.id OR f.friend2 = u.id
-                    LEFT JOIN
+                    JOIN
                         posts p ON p.creator_id = u.id
                     WHERE
                         u.id = ?
