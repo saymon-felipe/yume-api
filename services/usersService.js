@@ -164,9 +164,9 @@ let userService = {
                         COUNT(DISTINCT p.id) AS posts
                     FROM
                         users u
-                    JOIN
+                    LEFT JOIN
                         friends f ON f.friend1 = u.id OR f.friend2 = u.id
-                    JOIN
+                    LEFT JOIN
                         posts p ON p.creator_id = u.id
                     WHERE
                         u.id = ?
