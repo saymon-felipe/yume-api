@@ -35,6 +35,13 @@ let postsService = {
                             p.post_image,
                             p.post_text,
                             p.creator_id AS user_id,
+                            p.reference_post_profile_photo,
+                            p.reference_post_nickname,
+                            p.reference_post_create_date,
+                            p.reference_post_text,
+                            p.reference_post_image,
+                            p.reference_post_id,
+                            p.reference_post_user_id,
                             u.profile_photo,
                             u.nickname
                         FROM
@@ -60,7 +67,7 @@ let postsService = {
                             (SELECT COUNT(id) FROM post_likes pl WHERE pl.post_id = ts.id) AS likes,
                             (SELECT COUNT(id) FROM post_comments pm WHERE pm.post_id = ts.id) AS comments,
                             (SELECT COUNT(id) FROM posts where reference_post_id = ts.id) AS sharings,
-                            CASE WHEN EXISTS (SELECT 1 FROM post_likes WHERE post_id = ts.id AND user_id = 4) THEN 1 ELSE 0 END AS user_liked
+                            CASE WHEN EXISTS (SELECT 1 FROM post_likes WHERE post_id = ts.id AND liker_user = ?) THEN 1 ELSE 0 END AS user_liked
                         FROM
                             tmp_subquery ts;
                         
@@ -69,6 +76,54 @@ let postsService = {
                 `, [parseInt(limite), parseInt(offset), user_id]
             ).then((results) => {
                 resolve(results[2]);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    returnPost: function (post_id, user_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    CREATE TEMPORARY TABLE tmp_subquery AS
+                        SELECT
+                            p.id,
+                            p.create_date,
+                            p.post_image,
+                            p.post_text,
+                            p.creator_id AS user_id,
+                            u.profile_photo,
+                            u.nickname
+                        FROM
+                            posts p
+                        LEFT JOIN
+                            users u ON p.creator_id = u.id
+                        WHERE
+                            p.id = ?;
+                        
+                        INSERT INTO post_metadata (post_id, views, engagement)
+                        SELECT
+                            id,
+                            1 AS views,
+                            0 AS engagement
+                        FROM
+                            tmp_subquery
+                        ON DUPLICATE KEY UPDATE
+                            views = views + 1;
+                        
+                        SELECT
+                            ts.*,
+                            (SELECT COUNT(id) FROM post_likes pl WHERE pl.post_id = ts.id) AS likes,
+                            (SELECT COUNT(id) FROM post_comments pm WHERE pm.post_id = ts.id) AS comments,
+                            (SELECT COUNT(id) FROM posts where reference_post_id = ts.id) AS sharings,
+                            CASE WHEN EXISTS (SELECT 1 FROM post_likes pl WHERE pl.post_id = ts.id AND pl.liker_user = ?) THEN 1 ELSE 0 END AS user_liked
+                        FROM
+                            tmp_subquery ts;
+                        
+                        DROP TEMPORARY TABLE IF EXISTS tmp_subquery;
+                `, [post_id, user_id]
+            ).then((results) => {
+                resolve(results[2][0]);
             }).catch((error) => {
                 reject(error);
             })
@@ -86,6 +141,34 @@ let postsService = {
                 `, []
             ).then(() => {
                 resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    sharePost: function (user_id, post_id, profile_photo, nickname, create_date, text, post_image, new_text, reference_user_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    INSERT INTO
+                        posts
+                        (creator_id, create_date, reference_post_id, reference_post_profile_photo, reference_post_nickname, reference_post_create_date, reference_post_text, reference_post_image, post_text, reference_post_user_id)
+                    VALUES
+                        (?, DATE_ADD(CURRENT_TIMESTAMP(), interval -3 hour), ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [user_id, post_id, profile_photo, nickname, create_date, text, post_image, new_text, reference_user_id]
+            ).then((results) => {
+                let post = {
+                    id: results.insertId,
+                    post_text: new_text,
+                    reference_post_image: post_image,
+                    reference_post_profile_photo: profile_photo,
+                    reference_post_nickname: nickname,
+                    reference_post_create_date: create_date,
+                    reference_post_text: text,
+                    reference_post_user_id: reference_user_id
+                }
+
+                resolve(post);
             }).catch((error) => {
                 reject(error);
             })
