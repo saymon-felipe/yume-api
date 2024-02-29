@@ -57,10 +57,11 @@ let postsService = {
                             users u ON p.creator_id = u.id
                         LEFT JOIN
                             post_metadata pm ON p.id = pm.post_id
-                        GROUP BY
-                            p.id
 
                         ${ friends ? friendsQuery : "" }
+
+                        GROUP BY
+                            p.id
                         
                         LIMIT ? OFFSET ?;
 
