@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { isFriends, sendMessage, viewMessages } = require('../services/chatService');
 const { updateOnline } = require("../services/usersService");
 const { requestFriend } = require("../services/friendsService");
+const { likePost } = require("../services/postsService");
+const { viewNotifications } = require("../services/notificationsService");
 
 function initWebSocket(server) {
   const wss = new WebSocket.Server({ server });
@@ -88,12 +90,22 @@ function initWebSocket(server) {
             if (message.type == 'friend_request') {
                 let targetSocket = userConnections.get(parseInt(message.user_id));
 
-                if (targetSocket) {
-                    requestFriend(userId, message.user_id).then(() => {
+                requestFriend(userId, message.user_id).then(() => {
+                    if (targetSocket) {
                         targetSocket.send(JSON.stringify({ type: 'reload_notifications' }));
-                    });
-                }
+                    }
+                });
             } 
+
+            if (message.type == "post_like") {
+                let targetSocket = userConnections.get(parseInt(message.user_id));
+
+                likePost(userId, message.post_id).then(() => {
+                    if (targetSocket) {
+                        targetSocket.send(JSON.stringify({ type: 'reload_notifications' }));
+                    }
+                })
+            }
 
             if (message.type == "reload_system") {
                 let mySocket = userConnections.get(userId);
@@ -101,6 +113,10 @@ function initWebSocket(server) {
                 if (mySocket) {
                     mySocket.send(JSON.stringify({ type: 'reload_system' }));
                 }
+            }
+
+            if (message.type == "view_notifications") {
+                viewNotifications(userId);
             }
         });
     } catch (error) {
