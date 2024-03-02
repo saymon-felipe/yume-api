@@ -49,12 +49,39 @@ router.get("/return_user", login, (req, res, next) => {
 });
 
 router.post("/return_public_user", login, (req, res, next) => {
-    _usersService.returnUser(req.body.id, false).then((results) => {
+    _usersService.returnUser(req.body.id, false, req.usuario.id).then((results) => {
         let response = functions.createResponse("Retorno do usuário", results, "GET", 200);
         return res.status(200).send(response);
     }).catch((error) => {
         return res.status(500).send(error);
     })
 });
+
+router.post("/change_profile_photo", login, uploadConfig.upload.single('user_image'), (req, res, next) => {
+    _usersService.changeProfilePhoto(req.usuario.id, req.file.transforms[0].location).then((results) => {
+        let response = functions.createResponse("Foto de perfil alterada com sucesso", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+});
+
+router.post("/change_profile_banner", login, uploadConfig.upload.single('user_banner'), (req, res, next) => {
+    _usersService.changeProfileBanner(req.usuario.id, req.file.transforms[0].location).then((results) => {
+        let response = functions.createResponse("Imagem de fundo alterada com sucesso", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+});
+
+router.post("/return_feed", login, (req, res, next) => {
+    _usersService.returnFeed(req.usuario.id, req.body.user_id).then((results) => {
+        let response = functions.createResponse("Retorno das publicações do usuário", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
 
 module.exports = router;

@@ -5,6 +5,7 @@ const sendEmails = require("../config/sendEmail");
 const emailTemplates = require("../templates/emailTemplates");
 const jwt = require('jsonwebtoken');
 const NodeCache = require('node-cache');
+const _postsService = require("./postsService");
 
 const tokenCache = new NodeCache({ stdTTL: 28.800 });
 
@@ -144,7 +145,7 @@ let userService = {
             })
         })
     },
-    returnUser: function (user_id, return_email = true) {
+    returnUser: function (user_id, return_email = true, requesting_user = null) {
         return new Promise((resolve, reject) => {
             functions.executeSql(
                 `
@@ -161,7 +162,9 @@ let userService = {
                             WHEN f.friend1 = u.id THEN f.friend2
                             ELSE f.friend1
                         END) AS friend_ids,
-                        COUNT(DISTINCT p.id) AS posts
+                        COUNT(DISTINCT p.id) AS posts,
+                        CASE WHEN (SELECT COUNT(id) FROM blocked_users WHERE blocking_user = ${user_id} AND blocked_user = ${requesting_user} OR blocking_user = ${requesting_user} AND blocked_user = ${user_id}) > 0 THEN 1 ELSE 0 END AS blocked,
+                        CASE WHEN (SELECT COUNT(id) FROM blocked_users WHERE blocking_user = ${requesting_user} AND blocked_user = ${user_id}) > 0 THEN 1 ELSE 0 END AS requesting_user_has_blocked
                     FROM
                         users u
                     LEFT JOIN
@@ -200,14 +203,16 @@ let userService = {
                         nickname: results[0].nickname,
                         nick_at_sign: "@" + results[0].nickname,
                         email: return_email ? results[0].email : "",
-                        profile_photo: results[0].profile_photo,
-                        banner_photo: results[0].banner_photo,
+                        profile_photo: results[0].blocked == 1 ? process.env.URL_API + '/public/default-user-image.png' : results[0].profile_photo,
+                        banner_photo: results[0].blocked == 1 ? process.env.URL_API + '/public/default-banner-image.png' : results[0].banner_photo,
                         create_date: results[0].create_date,
                         visibility: results[0].visibility,
                         friends: results[0].friends,
                         friend_ids: results[0].friend_ids ? results[0].friend_ids.split(",") : [],
                         posts: results[0].posts,
-                        friends_objects: results2
+                        friends_objects: results2,
+                        blocked: results[0].blocked,
+                        requesting_user_has_blocked: results[0].requesting_user_has_blocked
                     }
     
                     resolve(user);
@@ -219,6 +224,51 @@ let userService = {
             })
         })
     },
+    changeProfilePhoto: function (user_id, photo_url) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        users
+                    SET
+                        profile_photo = ?
+                    WHERE
+                        id = ?
+                `, [photo_url, user_id]
+            ).then(() => {
+                resolve(photo_url);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    changeProfileBanner: function (user_id, photo_url) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        users
+                    SET
+                        banner_photo = ?
+                    WHERE
+                        id = ?
+                `, [photo_url, user_id]
+            ).then(() => {
+                resolve(photo_url);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    returnFeed: function (user_id, target_user_id) {
+        return new Promise((resolve, reject) => {            
+            _postsService.returnFeed(user_id, 0, 20, false, target_user_id).then((results) => {
+                resolve(results);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    }
 }
 
 module.exports = userService;

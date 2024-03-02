@@ -40,4 +40,22 @@ router.post("/unfriend", login, (req, res, next) => {
     })
 })
 
+router.post("/block", login, (req, res, next) => {
+    _friendsService.blockUser(req.usuario.id, req.body.target_user).then(() => {
+        let response = functions.createResponse("Usuário bloqueado com sucesso", null, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
+router.post("/unblock", login, (req, res, next) => {
+    _friendsService.unblockUser(req.usuario.id, req.body.target_user).then(() => {
+        let response = functions.createResponse("Usuário desbloqueado com sucesso", null, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
 module.exports = router;

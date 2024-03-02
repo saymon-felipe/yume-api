@@ -24,11 +24,16 @@ let postsService = {
             })
         })
     },
-    returnFeed: function (user_id, offset, limite, friends = false) {
+    returnFeed: function (user_id, offset, limite, friends = false, target_user_id = null) {
         return new Promise((resolve, reject) => {
             let friendsQuery = `
                     JOIN
                 friends f ON (p.creator_id = f.friend1 AND f.friend2 = ${user_id}) OR (p.creator_id = f.friend2 AND f.friend1 = ${user_id})
+            `
+
+            let personQuery = `
+                WHERE
+                   ts.user_id = ${target_user_id}
             `
 
             functions.executeSql(
@@ -57,6 +62,12 @@ let postsService = {
                             users u ON p.creator_id = u.id
                         LEFT JOIN
                             post_metadata pm ON p.id = pm.post_id
+                        WHERE
+                            (
+                                SELECT COUNT(id) 
+                                FROM blocked_users 
+                                WHERE (blocking_user = p.creator_id AND blocked_user = ${user_id}) OR (blocking_user = ${user_id} AND blocked_user = p.creator_id)
+                            ) = 0
 
                         ${ friends ? friendsQuery : "" }
 
@@ -84,6 +95,9 @@ let postsService = {
                             CASE WHEN EXISTS (SELECT 1 FROM post_likes WHERE post_id = ts.id AND liker_user = ?) THEN 1 ELSE 0 END AS user_liked
                         FROM
                             tmp_subquery ts
+
+                        ${target_user_id != null ? personQuery : ""}
+
                         ORDER BY
                             -- Ordena primeiro os posts mais relevantes (mais engajamento em menos tempo)
                             (ts.post_engagement / TIMESTAMPDIFF(SECOND, ts.create_date, NOW())) DESC,
