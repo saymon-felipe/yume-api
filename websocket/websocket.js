@@ -5,6 +5,7 @@ const { updateOnline } = require("../services/usersService");
 const { requestFriend } = require("../services/friendsService");
 const { likePost } = require("../services/postsService");
 const { viewNotifications } = require("../services/notificationsService");
+const { commentInPost, sharePost } = require("../services/postsService");
 
 function initWebSocket(server) {
   const wss = new WebSocket.Server({ server });
@@ -101,7 +102,27 @@ function initWebSocket(server) {
                 let targetSocket = userConnections.get(parseInt(message.user_id));
 
                 likePost(userId, message.post_id).then(() => {
-                    if (targetSocket) {
+                    if (targetSocket && message.user_id != userId) {
+                        targetSocket.send(JSON.stringify({ type: 'reload_notifications' }));
+                    }
+                })
+            }
+
+            if (message.type == "post_comment") {
+                let targetSocket = userConnections.get(parseInt(message.user_id));
+
+                commentInPost(userId, message.post_id, message.comment).then(() => {
+                    if (targetSocket && message.user_id != userId) {
+                        targetSocket.send(JSON.stringify({ type: 'reload_notifications' }));
+                    }
+                })
+            }
+
+            if (message.type == "post_share") {
+                let targetSocket = userConnections.get(parseInt(message.reference_user_id));
+
+                sharePost(userId, message.post_id, message.profile_photo, message.nickname, message.create_date, message.post_text, message.post_image, message.new_text, message.reference_user_id).then(() => {
+                    if (targetSocket && message.reference_user_id != userId) {
                         targetSocket.send(JSON.stringify({ type: 'reload_notifications' }));
                     }
                 })

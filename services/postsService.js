@@ -157,8 +157,8 @@ let postsService = {
         return new Promise((resolve, reject) => {
             functions.executeSql(
                 `
-                    INSERT INTO post_likes (post_id, liker_user)
-                    SELECT * FROM (SELECT ${post_id}, ${user_id}) AS tmp
+                    INSERT INTO post_likes (post_id, liker_user, create_date)
+                    SELECT * FROM (SELECT ${post_id}, ${user_id}, DATE_ADD(CURRENT_TIMESTAMP(), interval -3 hour)) AS tmp
                     WHERE NOT EXISTS (
                         SELECT 1 FROM post_likes WHERE post_id = ${post_id} AND liker_user = ${user_id}
                     ) LIMIT 1;
