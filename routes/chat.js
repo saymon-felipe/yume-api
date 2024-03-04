@@ -52,30 +52,4 @@ router.post("/view_messages", login, (req, res, next) => {
     })
 })
 
-router.post("/check_new_messages", login, (req, res, next) => {
-    _chatService.isFriends(req.usuario.id, req.body.destiny_user_id).then(() => {
-        _chatService.checkNewMessages(req.body.destiny_user_id, req.usuario.id).then((results) => {
-            let response = functions.createResponse("Verificando se existem mensagens não lidas", results, "POST", 200);
-            return res.status(200).send(response);
-        }).catch((error) => {
-            return res.status(500).send(error);
-        })
-    }).catch((error) => {
-        return res.status(500).send(error);
-    })
-})
-
-router.post("/check_viewed_messages", login, (req, res, next) => {
-    _chatService.isFriends(req.usuario.id, req.body.destiny_user_id).then(() => {
-        _chatService.checkViewedMessages(req.usuario.id, req.body.destiny_user_id).then((results) => {
-            let response = functions.createResponse("Verificando se as mensagens já foram lidas", results, "POST", 200);
-            return res.status(200).send(response);
-        }).catch((error) => {
-            return res.status(500).send(error);
-        })
-    }).catch((error) => {
-        return res.status(500).send(error);
-    })
-})
-
 module.exports = router;

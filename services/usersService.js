@@ -173,7 +173,7 @@ let userService = {
                         posts p ON p.creator_id = u.id
                     WHERE
                         u.id = ?
-                `, [user_id]
+                `, [user_id], true, 60
             ).then((results) => {
                 functions.executeSql(
                     `

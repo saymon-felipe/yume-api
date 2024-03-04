@@ -27,8 +27,7 @@ let postsService = {
     returnFeed: function (user_id, offset, limite, friends = false, target_user_id = null) {
         return new Promise((resolve, reject) => {
             let friendsQuery = `
-                    JOIN
-                friends f ON (p.creator_id = f.friend1 AND f.friend2 = ${user_id}) OR (p.creator_id = f.friend2 AND f.friend1 = ${user_id})
+                JOIN friends f ON (p.creator_id = f.friend1 AND f.friend2 = ${user_id}) OR (p.creator_id = f.friend2 AND f.friend1 = ${user_id})
             `
 
             let personQuery = `
@@ -39,79 +38,80 @@ let postsService = {
             functions.executeSql(
                 `
                     CREATE TEMPORARY TABLE tmp_subquery AS
-                        SELECT
-                            p.id,
-                            p.create_date,
-                            p.post_image,
-                            p.post_text,
-                            p.creator_id AS user_id,
-                            p.reference_post_profile_photo,
-                            p.reference_post_nickname,
-                            p.reference_post_create_date,
-                            p.reference_post_text,
-                            p.reference_post_image,
-                            p.reference_post_id,
-                            p.reference_post_user_id,
-                            u.profile_photo,
-                            u.nickname,
-                            pm.views AS post_views,
-                            pm.engagement AS post_engagement
-                        FROM
-                            posts p
-                        LEFT JOIN
-                            users u ON p.creator_id = u.id
-                        LEFT JOIN
-                            post_metadata pm ON p.id = pm.post_id
-                        WHERE
-                            (
-                                SELECT COUNT(id) 
-                                FROM blocked_users 
-                                WHERE (blocking_user = p.creator_id AND blocked_user = ${user_id}) OR (blocking_user = ${user_id} AND blocked_user = p.creator_id)
-                            ) = 0
+                    SELECT
+                        p.id,
+                        p.create_date,
+                        p.post_image,
+                        p.post_text,
+                        p.creator_id AS user_id,
+                        p.reference_post_profile_photo,
+                        p.reference_post_nickname,
+                        p.reference_post_create_date,
+                        p.reference_post_text,
+                        p.reference_post_image,
+                        p.reference_post_id,
+                        p.reference_post_user_id,
+                        u.profile_photo,
+                        u.nickname,
+                        pm.views AS post_views,
+                        pm.engagement AS post_engagement
+                    FROM
+                        posts p
+                    LEFT JOIN
+                        users u ON p.creator_id = u.id
+                    LEFT JOIN
+                        post_metadata pm ON p.id = pm.post_id
 
-                        ${ friends ? friendsQuery : "" }
+                    ${ friends ? friendsQuery : "" }
 
-                        GROUP BY
-                            p.id
-                        
-                        LIMIT ? OFFSET ?;
+                    WHERE
+                        (
+                            SELECT COUNT(id) 
+                            FROM blocked_users 
+                            WHERE (blocking_user = p.creator_id AND blocked_user = ${user_id}) OR (blocking_user = ${user_id} AND blocked_user = p.creator_id)
+                        ) = 0
 
-                        -- Inserção na tabela post_metadata com base nos resultados da subconsulta
-                        INSERT INTO post_metadata (post_id, views, engagement)
-                        SELECT
-                            id,
-                            1 AS views,
-                            0 AS engagement
-                        FROM
-                            tmp_subquery
-                        ON DUPLICATE KEY UPDATE
-                            views = views + 1;
+                    GROUP BY
+                        p.id
+                    
+                    LIMIT ? OFFSET ?;
 
-                        SELECT
-                            ts.*,
-                            (SELECT COUNT(id) FROM post_likes pl WHERE pl.post_id = ts.id) AS likes,
-                            (SELECT COUNT(id) FROM post_comments pm WHERE pm.post_id = ts.id) AS comments,
-                            (SELECT COUNT(id) FROM posts where reference_post_id = ts.id) AS sharings,
-                            CASE WHEN EXISTS (SELECT 1 FROM post_likes WHERE post_id = ts.id AND liker_user = ?) THEN 1 ELSE 0 END AS user_liked
-                        FROM
-                            tmp_subquery ts
+                    -- Inserção na tabela post_metadata com base nos resultados da subconsulta
+                    INSERT INTO post_metadata (post_id, views, engagement)
+                    SELECT
+                        id,
+                        1 AS views,
+                        0 AS engagement
+                    FROM
+                        tmp_subquery
+                    ON DUPLICATE KEY UPDATE
+                        views = views + 1;
 
-                        ${target_user_id != null ? personQuery : ""}
+                    SELECT
+                        ts.*,
+                        (SELECT COUNT(id) FROM post_likes pl WHERE pl.post_id = ts.id) AS likes,
+                        (SELECT COUNT(id) FROM post_comments pm WHERE pm.post_id = ts.id) AS comments,
+                        (SELECT COUNT(id) FROM posts where reference_post_id = ts.id) AS sharings,
+                        CASE WHEN EXISTS (SELECT 1 FROM post_likes WHERE post_id = ts.id AND liker_user = ?) THEN 1 ELSE 0 END AS user_liked
+                    FROM
+                        tmp_subquery ts
 
-                        ORDER BY
-                            -- Ordena primeiro os posts mais relevantes (mais engajamento em menos tempo)
-                            (ts.post_engagement / TIMESTAMPDIFF(SECOND, ts.create_date, NOW())) DESC,
-                            -- Em seguida, os mais relevantes em termos de visualizações
-                            (ts.post_views / TIMESTAMPDIFF(SECOND, ts.create_date, NOW())) DESC,
-                            -- Em seguida, os mais recentes
-                            ts.create_date DESC,
-                            -- Por fim, os mais antigos com menos visualizações
-                            ts.create_date ASC,
-                            ts.post_views ASC;
+                    ${target_user_id != null ? personQuery : ""}
 
-                        -- Remoção da tabela temporária após o uso
-                        DROP TEMPORARY TABLE IF EXISTS tmp_subquery;
-                `, [parseInt(limite), parseInt(offset), user_id]
+                    ORDER BY
+                        -- Ordena primeiro os posts mais relevantes (mais engajamento em menos tempo)
+                        (ts.post_engagement / TIMESTAMPDIFF(SECOND, ts.create_date, NOW())) DESC,
+                        -- Em seguida, os mais relevantes em termos de visualizações
+                        (ts.post_views / TIMESTAMPDIFF(SECOND, ts.create_date, NOW())) DESC,
+                        -- Em seguida, os mais recentes
+                        ts.create_date DESC,
+                        -- Por fim, os mais antigos com menos visualizações
+                        ts.create_date ASC,
+                        ts.post_views ASC;
+
+                    -- Remoção da tabela temporária após o uso
+                    DROP TEMPORARY TABLE IF EXISTS tmp_subquery;
+                `, [parseInt(limite), parseInt(offset), user_id], true, 60
             ).then((results) => {
                 resolve(results[2]);
             }).catch((error) => {
@@ -159,7 +159,7 @@ let postsService = {
                             tmp_subquery ts;
                         
                         DROP TEMPORARY TABLE IF EXISTS tmp_subquery;
-                `, [post_id, user_id]
+                `, [post_id, user_id], true, 60
             ).then((results) => {
                 resolve(results[2][0]);
             }).catch((error) => {
@@ -259,7 +259,7 @@ let postsService = {
                         users u ON pc.creator_id = u.id
                     WHERE
                         post_id = ?
-                `, [post_id]
+                `, [post_id], true, 60
             ).then((results) => {
                 resolve(results);
             }).catch((error) => {
