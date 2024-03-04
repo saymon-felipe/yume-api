@@ -268,6 +268,26 @@ let userService = {
                 reject(error);
             })
         })
+    },
+    returnSearchedUsers: function (searchString) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        id,
+                        nickname,
+                        profile_photo
+                    FROM
+                        users
+                    WHERE
+                        nickname LIKE "%${searchString}%";
+                `, [], true, 60
+            ).then((results) => {
+                resolve(results);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
     }
 }
 

@@ -84,4 +84,13 @@ router.post("/return_feed", login, (req, res, next) => {
     })
 })
 
+router.post("/search_users", login, (req, res, next) => {
+    _usersService.returnSearchedUsers(req.body.searchString).then((results) => {
+        let response = functions.createResponse("Retorno da lista de usuários", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
 module.exports = router;
