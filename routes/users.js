@@ -93,4 +93,22 @@ router.post("/search_users", login, (req, res, next) => {
     })
 })
 
+router.post("/update_account", login, (req, res, next) => {
+    _usersService.changeAccount(req.usuario.id, req.body.nickname, req.body.old_password, req.body.password, req.body.visibility).then((results) => {
+        let response = functions.createResponse("Conta alterada com sucesso", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
+router.post("/exclude_account", login, (req, res, next) => {
+    _usersService.excludeAccount(req.usuario.id).then((results) => {
+        let response = functions.createResponse("Conta excluída com sucesso", null, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
 module.exports = router;

@@ -288,6 +288,146 @@ let userService = {
                 reject(error);
             })
         })
+    },
+    changeAccount: async function (user_id, nickname, old_password = "", password = "", visibility) {
+        return new Promise((resolve, reject) => {
+            if (visibility != "visible" && visibility != "hidden" || nickname.trim().length < 3) reject("Valores inválidos");
+
+            functions.executeSql(
+                `
+                    SELECT
+                        password
+                    FROM
+                        users
+                    WHERE
+                        id = ?
+                `, [user_id]
+            ).then((results) => {
+                bcrypt.compare(old_password, results[0].password, (error2, result) => {
+                    let obj = {
+                        changed_password: false,
+                        token: null
+                    }
+
+                    if (result && password != old_password) {
+                        let token = jwt.sign({
+                            id: results[0].id,
+                            email: results[0].email,
+                            nickname: results[0].nickname
+                        }, 
+                        process.env.JWT_KEY,
+                        {
+                            expiresIn: "8h"
+                        })
+                        
+                        bcrypt.hash(password, 10, (errBcrypt, hash) => {
+                            obj.token = token;
+                            obj.changed_password = true;
+
+                            functions.executeSql(
+                                `
+                                    UPDATE
+                                        users
+                                    SET
+                                        password = '${hash}'
+                                    WHERE
+                                        id = ?
+                                `, [user_id]
+                            ).then(() => {
+                                resolve(obj);
+                            }).catch((error) => {
+                                reject(error);
+                            })
+                        })
+
+                        obj.token = token;
+                        obj.changed_password = true;
+                    }
+
+                    functions.executeSql(
+                        `
+                            UPDATE
+                                users
+                            SET
+                                nickname = "${nickname}",    
+                                visibility = "${ visibility }"
+                            WHERE
+                                id = ?
+                        `, [user_id]
+                    ).then(() => {
+                        resolve(obj);
+                    }).catch((error) => {
+                        reject(error);
+                    })
+                });
+            })
+        })
+    },
+    excludeAccount: function (user_id) {
+        return new Promise((resolve, reject) => {
+            let promises = [];
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            posts
+                        WHERE
+                            creator_id = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            post_likes
+                        WHERE
+                            liker_user = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            friends
+                        WHERE
+                            friend1 = ${user_id} OR friend2 = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            post_comments
+                        WHERE
+                            creator_id = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            users
+                        WHERE
+                            id = ${user_id}
+                    `, []
+                )
+            )
+
+            Promise.all(promises).then(() => {
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
     }
 }
 
