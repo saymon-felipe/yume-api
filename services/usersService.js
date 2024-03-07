@@ -404,6 +404,17 @@ let userService = {
                 functions.executeSql(
                     `
                         DELETE FROM
+                            friend_requests
+                        WHERE
+                            requesting_user = ${user_id} OR requested_user = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
                             post_comments
                         WHERE
                             creator_id = ${user_id}
@@ -423,6 +434,67 @@ let userService = {
             )
 
             Promise.all(promises).then(() => {
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    postDiary: function (user_id, post_text = "") {
+        return new Promise((resolve, reject) => {
+            if (post_text.trim() == "") {
+                reject("O conteúdo do diário não pode ser vazio");
+            }
+
+            functions.executeSql(
+                `
+                    INSERT INTO
+                        diary
+                        (creator_id, diary_text, create_date)
+                    VALUES
+                        (${user_id}, '${post_text}', DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour))
+                `, []
+            ).then((results) => {
+                resolve(results.insertId);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    returnDiaryPages: function (user_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        *
+                    FROM
+                        diary
+                    WHERE
+                        creator_id = ${user_id}
+                `, [], true, 60
+            ).then((results) => {
+                resolve(results);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    deletePage: function (user_id, page_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    DELETE FROM
+                        diary
+                    WHERE
+                        id = ${page_id}
+                    AND
+                        creator_id = ${user_id}
+                `, []
+            ).then((results) => {
+                if (results.affectedRows == 0) {
+                    reject("Post inexistente ou você não é o dono");
+                }
+
                 resolve();
             }).catch((error) => {
                 reject(error);

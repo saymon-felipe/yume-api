@@ -111,4 +111,31 @@ router.post("/exclude_account", login, (req, res, next) => {
     })
 })
 
+router.post("/diary", login, (req, res, next) => {
+    _usersService.postDiary(req.usuario.id, req.body.diary_text).then((results) => {
+        let response = functions.createResponse("Diário guardado com sucesso", results, "POST", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
+router.get("/diary", login, (req, res, next) => {
+    _usersService.returnDiaryPages(req.usuario.id).then((results) => {
+        let response = functions.createResponse("Retorno das páginas do diário", results, "GET", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
+router.delete("/diary/:post_id/delete_page", login, (req, res, next) => {
+    _usersService.deletePage(req.usuario.id, req.params.post_id).then(() => {
+        let response = functions.createResponse("Página do diário excluída com sucesso", null, "DELETE", 200);
+        return res.status(200).send(response);
+    }).catch((error) => {
+        return res.status(500).send(error);
+    })
+})
+
 module.exports = router;
