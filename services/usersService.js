@@ -1,0 +1,506 @@
+const functions = require("../utils/functions");
+const bcrypt = require('bcrypt');
+const uploadConfig = require('../config/upload');
+const sendEmails = require("../config/sendEmail");
+const emailTemplates = require("../templates/emailTemplates");
+const jwt = require('jsonwebtoken');
+const NodeCache = require('node-cache');
+const _postsService = require("./postsService");
+
+const tokenCache = new NodeCache({ stdTTL: 28.800 });
+
+let userService = {
+    register: function (email, nickname, password) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        id
+                    FROM
+                        users
+                    WHERE
+                        email = ?
+                    OR
+                        nickname = ?
+                `, [email, nickname]
+            ).then((results) => {
+                if (results.length > 0) {
+                    reject("Nickname ou email indisponível");
+                } else {                    
+                    bcrypt.hash(password, 10, (errBcrypt, hash) => {
+                        if (errBcrypt) {
+                            reject(errBcrypt);
+                        }
+
+                        functions.executeSql(
+                            `
+                                INSERT INTO
+                                    users
+                                    (nickname, email, password, profile_photo, banner_photo)
+                                VALUES
+                                    (?, ?, ?, ?, ?)
+                            `, [
+                                nickname, 
+                                email, 
+                                hash, 
+                                process.env.URL_API + '/public/default-user-image.png',
+                                process.env.URL_API + '/public/default-banner-image.png'
+                            ]
+                        ).then((results2) => {
+
+                            let createdUser = {
+                                id: results2.insertId,
+                                email: email
+                            }
+
+                            resolve(createdUser);
+                        }).catch((error2) => {
+                            reject(error2);
+                        })
+                    });
+                }
+            }).catch((error) => {
+                reject(error);
+            })        
+        })
+    },
+    login: function (email, password) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        *
+                    FROM
+                        users
+                    WHERE
+                        email = ?
+                `, [email]
+            ).then((results) => {
+                if (results.length < 1) {
+                    reject("Falha na autenticação");
+                } else {
+                    bcrypt.compare(password, results[0].password, (error2, result) => {
+                        if (error2) {
+                            reject("Falha na autenticação");
+                        }
+
+                        if (result) {
+                            let token = jwt.sign({
+                                id: results[0].id,
+                                email: results[0].email,
+                                nickname: results[0].nickname
+                            }, 
+                            process.env.JWT_KEY,
+                            {
+                                expiresIn: "8h"
+                            })
+
+                            resolve(token);
+                        }
+
+                        reject("Falha na autenticação");
+                    });
+                }
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    updateOnline: function (online = 0, user_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        users
+                    SET
+                        online = ?, last_update = DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour)
+                    WHERE
+                        id = ?
+                `, [online, user_id]
+            ).then((results) => {
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    checkJwt: function (tokenParam) {
+        return new Promise((resolve, reject) => {
+            let token = tokenParam.split(" ")[1];
+            jwt.verify(token, process.env.JWT_KEY, (err, decoded) => {
+                if (err) {
+                    reject("Token inválido");
+                } else {
+                    let newToken = jwt.sign({
+                        id: decoded.id,
+                        email: decoded.email,
+                        nickname: decoded.nickname
+                    }, process.env.JWT_KEY, {expiresIn: "8h"});
+
+                    tokenCache.set(decoded.id, newToken);
+                    tokenCache.del(token);
+                    
+                    resolve(newToken);
+                }
+            })
+        })
+    },
+    returnUser: function (user_id, return_email = true, requesting_user = null) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        u.id,
+                        u.nickname,
+                        u.email,
+                        u.profile_photo,
+                        u.banner_photo,
+                        u.create_date,
+                        u.visibility,
+                        COUNT(DISTINCT f.id) AS friends,
+                        GROUP_CONCAT(DISTINCT CASE
+                            WHEN f.friend1 = u.id THEN f.friend2
+                            ELSE f.friend1
+                        END) AS friend_ids,
+                        COUNT(DISTINCT p.id) AS posts,
+                        CASE WHEN (SELECT COUNT(id) FROM blocked_users WHERE blocking_user = ${user_id} AND blocked_user = ${requesting_user} OR blocking_user = ${requesting_user} AND blocked_user = ${user_id}) > 0 THEN 1 ELSE 0 END AS blocked,
+                        CASE WHEN (SELECT COUNT(id) FROM blocked_users WHERE blocking_user = ${requesting_user} AND blocked_user = ${user_id}) > 0 THEN 1 ELSE 0 END AS requesting_user_has_blocked
+                    FROM
+                        users u
+                    LEFT JOIN
+                        friends f ON f.friend1 = u.id OR f.friend2 = u.id
+                    LEFT JOIN
+                        posts p ON p.creator_id = u.id
+                    WHERE
+                        u.id = ?
+                `, [user_id], true, 60
+            ).then((results) => {
+                functions.executeSql(
+                    `
+                        SELECT
+                            u.id,
+                            u.nickname,
+                            u.profile_photo,
+                            (
+                                SELECT
+                                    COUNT(id)
+                                FROM
+                                    friends
+                                WHERE
+                                    friend1 = u.id OR friend2 = u.id
+                            ) AS friends
+                        FROM 
+                            users u
+                        INNER JOIN
+                            friends f ON (f.friend1 = u.id OR f.friend2 = u.id)
+                        WHERE
+                            (f.friend1 = ? OR f.friend2 = ?)
+                            AND u.id != ?
+                    `, [user_id, user_id, user_id]
+                ).then((results2) => {
+                    let user = {
+                        id: results[0].id,
+                        nickname: results[0].nickname,
+                        nick_at_sign: "@" + results[0].nickname,
+                        email: return_email ? results[0].email : "",
+                        profile_photo: results[0].blocked == 1 ? process.env.URL_API + '/public/default-user-image.png' : results[0].profile_photo,
+                        banner_photo: results[0].blocked == 1 ? process.env.URL_API + '/public/default-banner-image.png' : results[0].banner_photo,
+                        create_date: results[0].create_date,
+                        visibility: results[0].visibility,
+                        friends: results[0].friends,
+                        friend_ids: results[0].friend_ids ? results[0].friend_ids.split(",") : [],
+                        posts: results[0].posts,
+                        friends_objects: results2,
+                        blocked: results[0].blocked,
+                        requesting_user_has_blocked: results[0].requesting_user_has_blocked
+                    }
+    
+                    resolve(user);
+                }).catch((error) => {
+                    reject(error);
+                })
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    changeProfilePhoto: function (user_id, photo_url) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        users
+                    SET
+                        profile_photo = ?
+                    WHERE
+                        id = ?
+                `, [photo_url, user_id]
+            ).then(() => {
+                resolve(photo_url);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    changeProfileBanner: function (user_id, photo_url) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    UPDATE
+                        users
+                    SET
+                        banner_photo = ?
+                    WHERE
+                        id = ?
+                `, [photo_url, user_id]
+            ).then(() => {
+                resolve(photo_url);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    returnFeed: function (user_id, target_user_id) {
+        return new Promise((resolve, reject) => {            
+            _postsService.returnFeed(user_id, 0, 20, false, target_user_id).then((results) => {
+                resolve(results);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    returnSearchedUsers: function (searchString) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        id,
+                        nickname,
+                        profile_photo
+                    FROM
+                        users
+                    WHERE
+                        nickname LIKE "%${searchString}%";
+                `, [], true, 60
+            ).then((results) => {
+                resolve(results);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    changeAccount: async function (user_id, nickname, old_password = "", password = "", visibility) {
+        return new Promise((resolve, reject) => {
+            if (visibility != "visible" && visibility != "hidden" || nickname.trim().length < 3) reject("Valores inválidos");
+
+            functions.executeSql(
+                `
+                    SELECT
+                        password
+                    FROM
+                        users
+                    WHERE
+                        id = ?
+                `, [user_id]
+            ).then((results) => {
+                bcrypt.compare(old_password, results[0].password, (error2, result) => {
+                    let obj = {
+                        changed_password: false,
+                        token: null
+                    }
+
+                    if (result && password != old_password) {
+                        let token = jwt.sign({
+                            id: results[0].id,
+                            email: results[0].email,
+                            nickname: results[0].nickname
+                        }, 
+                        process.env.JWT_KEY,
+                        {
+                            expiresIn: "8h"
+                        })
+                        
+                        bcrypt.hash(password, 10, (errBcrypt, hash) => {
+                            obj.token = token;
+                            obj.changed_password = true;
+
+                            functions.executeSql(
+                                `
+                                    UPDATE
+                                        users
+                                    SET
+                                        password = '${hash}'
+                                    WHERE
+                                        id = ?
+                                `, [user_id]
+                            ).then(() => {
+                                resolve(obj);
+                            }).catch((error) => {
+                                reject(error);
+                            })
+                        })
+
+                        obj.token = token;
+                        obj.changed_password = true;
+                    }
+
+                    functions.executeSql(
+                        `
+                            UPDATE
+                                users
+                            SET
+                                nickname = "${nickname}",    
+                                visibility = "${ visibility }"
+                            WHERE
+                                id = ?
+                        `, [user_id]
+                    ).then(() => {
+                        resolve(obj);
+                    }).catch((error) => {
+                        reject(error);
+                    })
+                });
+            })
+        })
+    },
+    excludeAccount: function (user_id) {
+        return new Promise((resolve, reject) => {
+            let promises = [];
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            posts
+                        WHERE
+                            creator_id = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            post_likes
+                        WHERE
+                            liker_user = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            friends
+                        WHERE
+                            friend1 = ${user_id} OR friend2 = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            friend_requests
+                        WHERE
+                            requesting_user = ${user_id} OR requested_user = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            post_comments
+                        WHERE
+                            creator_id = ${user_id}
+                    `, []
+                )
+            )
+
+            promises.push(
+                functions.executeSql(
+                    `
+                        DELETE FROM
+                            users
+                        WHERE
+                            id = ${user_id}
+                    `, []
+                )
+            )
+
+            Promise.all(promises).then(() => {
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    postDiary: function (user_id, post_text = "") {
+        return new Promise((resolve, reject) => {
+            if (post_text.trim() == "") {
+                reject("O conteúdo do diário não pode ser vazio");
+            }
+
+            functions.executeSql(
+                `
+                    INSERT INTO
+                        diary
+                        (creator_id, diary_text, create_date)
+                    VALUES
+                        (${user_id}, '${post_text}', DATE_ADD(CURRENT_TIMESTAMP, interval -3 hour))
+                `, []
+            ).then((results) => {
+                resolve(results.insertId);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    returnDiaryPages: function (user_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    SELECT
+                        *
+                    FROM
+                        diary
+                    WHERE
+                        creator_id = ${user_id}
+                `, [], true, 60
+            ).then((results) => {
+                resolve(results);
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    },
+    deletePage: function (user_id, page_id) {
+        return new Promise((resolve, reject) => {
+            functions.executeSql(
+                `
+                    DELETE FROM
+                        diary
+                    WHERE
+                        id = ${page_id}
+                    AND
+                        creator_id = ${user_id}
+                `, []
+            ).then((results) => {
+                if (results.affectedRows == 0) {
+                    reject("Post inexistente ou você não é o dono");
+                }
+
+                resolve();
+            }).catch((error) => {
+                reject(error);
+            })
+        })
+    }
+}
+
+module.exports = userService;
