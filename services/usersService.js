@@ -471,6 +471,7 @@ let userService = {
                         diary
                     WHERE
                         creator_id = ${user_id}
+                    ORDER BY create_date DESC
                 `, [], true, 60
             ).then((results) => {
                 resolve(results);
